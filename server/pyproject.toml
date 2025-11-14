@@ -3,9 +3,19 @@ name = "dummy"
 version = "0.1.0"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "beautifulsoup4>=4.14.2",
+    "chardet>=5.2.0",
+    "ebooklib>=0.20",
     "fastapi>=0.115.11",
     "jinja2>=3.1.6",
+    "lxml>=6.0.2",
+    "odfpy>=1.4.1",
     "openai>=1.67.0",
+    "openpyxl>=3.1.5",
+    "pandas>=2.3.3",
+    "pdfplumber>=0.11.8",
+    "python-docx>=1.2.0",
+    "python-magic>=0.4.27",
     "pyyaml>=6.0.2",
     "tavily>=1.1.0",
 ]

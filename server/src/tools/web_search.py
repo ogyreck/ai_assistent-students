@@ -6,13 +6,14 @@ from typing import TYPE_CHECKING
 
 from pydantic import Field
 
-
+from server.src.config.Config import CONFIG
+from server.src.service.tavily_search import TavilySearchService
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-class WebSearchTool(BaseTool):
+class WebSearchTool():
     """Search the web for real-time information about any topic.
     Use this tool when you need up-to-date information that might not be available in your training data,
     or when you need to verify current facts.
@@ -40,7 +41,7 @@ class WebSearchTool(BaseTool):
     reasoning: str = Field(description="Why this search is needed and what to expect")
     query: str = Field(description="Search query in same language as user request")
     max_results: int = Field(
-        default_factory=lambda: min(GlobalConfig().search.max_results, 10),
+        default_factory=lambda: min(CONFIG.search.max_results, 10),
         description="Maximum results",
         ge=1,
         le=10,
