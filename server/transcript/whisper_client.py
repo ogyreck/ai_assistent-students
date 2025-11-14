@@ -6,7 +6,7 @@ from typing import Optional
 
 from openai import OpenAI
 
-from config import OPENAI_API_KEY, WHISPER_MODEL
+from config import OPENAI_API_KEY, OPENROUTER_BASE_URL
 
 
 class WhisperClient:
@@ -23,7 +23,7 @@ class WhisperClient:
         if not self.api_key:
             raise ValueError("OpenAI API key не найден. Установите OPENAI_API_KEY в .env")
 
-        self.client = OpenAI(api_key=self.api_key)
+        self.client = OpenAI(api_key=self.api_key, base_url=OPENROUTER_BASE_URL)
 
     def transcribe_audio(
         self,
@@ -54,13 +54,16 @@ class WhisperClient:
         print(f"Отправка файла {audio_path.name} в Whisper API...")
 
         try:
-            with open(audio_path, "rb") as audio_file:
-                transcript = self.client.audio.transcriptions.create(
-                    model=WHISPER_MODEL,
-                    file=audio_file,
-                    language=language,
-                    response_format=response_format
-                )
+            audio_file = open(audio_path, "rb")
+
+            transcript = self.client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file,
+                language=language,
+                response_format=response_format
+            )
+
+            audio_file.close()
 
             # Если response_format="text", возвращается строка
             # Если "json", возвращается объект с полем text

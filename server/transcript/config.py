@@ -17,8 +17,8 @@ OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
 OPENROUTER_API_KEY: Optional[str] = os.getenv("OPENROUTER_API_KEY")
 
 # Настройки OpenRouter
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3-sonnet")
+OPENROUTER_BASE_URL = "https://caila.io/api/adapters/openai"
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "just-ai/openai-proxy/whisper-1")
 
 # Промпт для обработки транскрипции
 DEFAULT_PROMPT = os.getenv(
@@ -27,7 +27,7 @@ DEFAULT_PROMPT = os.getenv(
 )
 
 # Настройки Whisper
-WHISPER_MODEL = "whisper-1"
+WHISPER_MODEL = OPENROUTER_MODEL
 
 # Директория для временных файлов
 TEMP_DIR = BASE_DIR / "temp"
