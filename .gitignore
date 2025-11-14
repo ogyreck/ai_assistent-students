@@ -5,6 +5,7 @@
 *.env
 .venv
 uploads/
+calendar_storage/
 
 # IDE and editors
 .vscode/
