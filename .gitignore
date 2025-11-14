@@ -70,3 +70,5 @@ settings.local.*
 transcript/transcriptions.json
 transcript/temp/
 transcript/.env
+transcript/*.mp3
+
