@@ -27,6 +27,7 @@ class SearchConfig:
 
 @dataclass
 class Config:
+    transcribe: LLMConfig
     llm: LLMConfig
     qdrant: QdrantConfig
     search: SearchConfig

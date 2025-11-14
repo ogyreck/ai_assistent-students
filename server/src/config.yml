@@ -1,7 +1,22 @@
+transcribe:
+  url: https://caila.io/api/mlpgate/account/just-ai/model/faster-whisper-tiny/predict
+  model: just-ai/faster-whisper-tiny
+  token: 1000097868.172365.drHp7TnmsyVlDYv7mkCHm07OrJVAX4kXxdVPw7wB
+
+# LLM Configuration (OpenRouter)
 llm:
-  url: https://openrouter.ai/api/v1
-  model: qwen/qwen3-32b
-  token: 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
+  url: https://caila.io/api/adapters/openai
+  model: just-ai/openai-proxy/gpt-4o-mini
+  token: 1000097868.172365.drHp7TnmsyVlDYv7mkCHm07OrJVAX4kXxdVPw7wB
+
+# Qdrant Vector Database Configuration
+qdrant:
+  host: localhost
+  port: 6333
+  collection_name: default
+  model_name: all-MiniLM-L6-v2
+  vector_size: 384
+  top_samples: 10
 
 # Search Configuration (Tavily)
 search:
