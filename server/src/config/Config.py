@@ -3,6 +3,19 @@ from dataclasses import dataclass, fields, is_dataclass
 import yaml
 
 @dataclass
+class LLMConfig:
+    url: str
+    token: str
+    model: str
+
+@dataclass
+class ChunksConfig:
+    chunk_size: int
+    overlap: int
+    model_name: str
+    encoder_max_seq_length: int
+
+@dataclass
 class QdrantConfig:
     host: str
     port: int
@@ -10,12 +23,31 @@ class QdrantConfig:
     model_name: str
     vector_size: int
     top_samples: int
+    batch_size: int
 
 @dataclass
-class LLMConfig:
-    url: str
-    token: str
-    model: str
+class RerankerConfig:
+    model_name: str
+    top_samples: int
+
+@dataclass
+class LoggingConfigConsole:
+    enabled: bool
+
+@dataclass
+class LoggingConfigGraylog:
+    enabled: bool
+    host: str
+    port: int
+    udp: bool
+
+@dataclass
+class LoggingConfig:
+    console: LoggingConfigConsole
+    graylog: LoggingConfigGraylog
+    app_name: str
+    root_level: str
+    levels: dict[str, str]
 
 @dataclass
 class SearchConfig:
@@ -30,6 +62,9 @@ class Config:
     llm: LLMConfig
     qdrant: QdrantConfig
     search: SearchConfig
+    chunks: ChunksConfig
+    reranker: RerankerConfig
+    logging: LoggingConfig
 
 class ConfigLoader:
 

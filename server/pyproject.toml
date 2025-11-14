@@ -1,5 +1,5 @@
 [project]
-name = "student assistant"
+name = "student_assistant"
 version = "0.1.0"
 requires-python = ">=3.12,<3.13"
 dependencies = [
@@ -23,6 +23,7 @@ dependencies = [
     "python-magic>=0.4.27",
     "tavily>=1.1.0",
     "uvicorn>=0.35.0",
+    "sentence-transformers",
 ]
 
 [tool.ruff]
@@ -36,3 +37,10 @@ select = ["E", "F", "B", "I"]
 quote-style = "double"
 indent-style = "space"
 line-ending = "auto"
+
+[tool.uv]
+override-dependencies = [
+    "torch==2.0.0+cpu",
+    "torchvision==0.15.0+cpu",
+    "torchaudio==2.0.0+cpu",
+]
