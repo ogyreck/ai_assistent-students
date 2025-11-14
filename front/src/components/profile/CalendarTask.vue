@@ -132,10 +132,14 @@ const editingTask = ref<Task | null>(null)
 const selectedDate = ref<string>('')
 
 const tasks = ref<Task[]>([])
+const userId = ref<string>('user-1') // Default user ID, can be updated from store
 
 onMounted(async () => {
   try {
-    const data = await apiService.getTasks()
+    // Load tasks for current month from backend calendar state
+    const year = currentDate.value.getFullYear()
+    const month = currentDate.value.getMonth() + 1
+    const data = await apiService.getCalendarTasks(userId.value, year, month)
     tasks.value = data
   } catch (error) {
     console.error('Failed to load tasks:', error)
@@ -263,28 +267,42 @@ async function saveTask() {
   if (!taskForm.title || !taskForm.date || !taskForm.time) return
 
   try {
+    const year = new Date(taskForm.date).getFullYear()
+    const month = new Date(taskForm.date).getMonth() + 1
+
     if (editingTask.value) {
       // Update existing task
-      const updatedTask = await apiService.updateTask(editingTask.value.id, {
-        id: editingTask.value.id,
-        title: taskForm.title,
-        description: taskForm.description,
-        date: taskForm.date,
-        time: taskForm.time,
-      })
+      const updatedTask = await apiService.updateCalendarTask(
+        userId.value,
+        year,
+        month,
+        editingTask.value.id,
+        {
+          id: editingTask.value.id,
+          title: taskForm.title,
+          description: taskForm.description,
+          date: taskForm.date,
+          time: taskForm.time,
+        }
+      )
       const index = tasks.value.findIndex(t => t.id === editingTask.value!.id)
       if (index !== -1) {
         tasks.value[index] = updatedTask
       }
     } else {
       // Create new task
-      const newTask = await apiService.createTask({
-        id: Date.now().toString(),
-        title: taskForm.title,
-        description: taskForm.description,
-        date: taskForm.date,
-        time: taskForm.time,
-      })
+      const newTask = await apiService.createCalendarTask(
+        userId.value,
+        year,
+        month,
+        {
+          id: Date.now().toString(),
+          title: taskForm.title,
+          description: taskForm.description,
+          date: taskForm.date,
+          time: taskForm.time,
+        }
+      )
       tasks.value.push(newTask)
     }
 
@@ -298,7 +316,10 @@ async function deleteTask() {
   if (!editingTask.value) return
 
   try {
-    await apiService.deleteTask(editingTask.value.id)
+    const year = new Date(editingTask.value.date).getFullYear()
+    const month = new Date(editingTask.value.date).getMonth() + 1
+
+    await apiService.deleteCalendarTask(userId.value, year, month, editingTask.value.id)
     tasks.value = tasks.value.filter(t => t.id !== editingTask.value!.id)
 
     closeModal()

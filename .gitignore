@@ -4,6 +4,7 @@
 .env.*.local
 *.env
 .venv
+uploads/
 
 # IDE and editors
 .vscode/

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -16,6 +16,8 @@ try:
     from config.Config import CONFIG
     from service.llm_client import create_llm_client
     from service.whisper_service import create_whisper_transcriber
+    from service.calendar_service import CalendarService
+    from service.project_service import ProjectService
 
     # Initialize LLM client from config
     llm_client = create_llm_client(
@@ -36,6 +38,14 @@ try:
     print(f"  Model: {CONFIG.transcribe.model}")
     print(f"  URL: {CONFIG.transcribe.url}")
 
+    # Initialize Calendar Service
+    calendar_service = CalendarService(storage_dir="calendar_storage")
+    print(f"✓ Calendar Service initialized successfully")
+
+    # Initialize Project Service
+    project_service = ProjectService(storage_dir="project_storage")
+    print(f"✓ Project Service initialized successfully")
+
 except Exception as e:
     print(f"✗ Error loading config or initializing services:")
     print(f"  {e}")
@@ -44,6 +54,8 @@ except Exception as e:
     # Fallback to dummy clients for testing
     llm_client = None
     whisper_transcriber = None
+    calendar_service = None
+    project_service = None
 
 app = FastAPI(title="Student Assistant API")
 
@@ -75,12 +87,14 @@ class Project(BaseModel):
     id: str
     name: str
     created_at: str
+    updated_at: Optional[str] = None
 
 class Chat(BaseModel):
     id: str
     project_id: str
     name: str
     created_at: str
+    updated_at: Optional[str] = None
 
 class Message(BaseModel):
     id: str
@@ -102,6 +116,25 @@ class ChatEdge(BaseModel):
 class ChatGraph(BaseModel):
     nodes: List[ChatNode]
     edges: List[ChatEdge]
+
+class Document(BaseModel):
+    id: str
+    project_id: str
+    filename: str
+    file_size: int
+    uploaded_at: str
+    uploaded_by_user: str
+
+class CreateProjectRequest(BaseModel):
+    name: str
+
+class CreateChatRequest(BaseModel):
+    project_id: str
+    name: str
+
+class CreateMessageRequest(BaseModel):
+    content: str
+    role: str = "user"
 
 # ==================== MOCK DATA ====================
 
@@ -171,6 +204,9 @@ mock_graph = ChatGraph(
         ChatEdge(source="chat-3", target="topic-2", label=">1AC6405B"),
     ]
 )
+
+# Mock documents storage
+mock_documents = {}
 
 # ==================== USER ENDPOINTS ====================
 
@@ -324,21 +360,250 @@ async def delete_task(task_id: str):
     mock_tasks = [t for t in mock_tasks if t.id != task_id]
     return {"success": True}
 
+# ==================== CALENDAR STATE ENDPOINTS ====================
+
+from service.calendar_service import CalendarState, CalendarTask as CalendarTaskModel
+
+@app.get("/api/calendar/state/{user_id}/{year}/{month}", response_model=CalendarState)
+async def get_calendar_state(user_id: str, year: int, month: int):
+    """
+    Get calendar state for a specific month
+
+    Args:
+        user_id: User ID
+        year: Year (e.g., 2025)
+        month: Month (1-12)
+
+    Returns:
+        CalendarState object with all tasks for that month
+    """
+    if calendar_service is None:
+        raise HTTPException(status_code=503, detail="Calendar service not initialized")
+
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=400, detail="Month must be between 1 and 12")
+
+    state = calendar_service.get_or_create_state(user_id, year, month)
+    return state
+
+
+@app.get("/api/calendar/tasks/{user_id}/{year}/{month}", response_model=List[CalendarTaskModel])
+async def get_calendar_tasks(user_id: str, year: int, month: int):
+    """
+    Get all tasks for a specific month
+
+    Args:
+        user_id: User ID
+        year: Year (e.g., 2025)
+        month: Month (1-12)
+
+    Returns:
+        List of CalendarTask objects
+    """
+    if calendar_service is None:
+        raise HTTPException(status_code=503, detail="Calendar service not initialized")
+
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=400, detail="Month must be between 1 and 12")
+
+    tasks = calendar_service.get_all_tasks_in_month(user_id, year, month)
+    return tasks
+
+
+@app.get("/api/calendar/all-tasks/{user_id}", response_model=List[CalendarTaskModel])
+async def get_all_calendar_tasks(user_id: str):
+    """
+    Get all tasks for a user across all months
+
+    Args:
+        user_id: User ID
+
+    Returns:
+        List of all CalendarTask objects for the user
+    """
+    if calendar_service is None:
+        raise HTTPException(status_code=503, detail="Calendar service not initialized")
+
+    tasks = calendar_service.get_all_tasks_for_user(user_id)
+    return tasks
+
+
+@app.post("/api/calendar/task/{user_id}/{year}/{month}", response_model=CalendarTaskModel)
+async def create_calendar_task(
+    user_id: str,
+    year: int,
+    month: int,
+    task: CalendarTaskModel
+):
+    """
+    Create a new task in calendar state
+
+    Args:
+        user_id: User ID
+        year: Year (e.g., 2025)
+        month: Month (1-12)
+        task: CalendarTask object with title, description, date, time, and id
+
+    Returns:
+        Created CalendarTask object
+    """
+    if calendar_service is None:
+        raise HTTPException(status_code=503, detail="Calendar service not initialized")
+
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=400, detail="Month must be between 1 and 12")
+
+    if not task.id:
+        raise HTTPException(status_code=400, detail="Task must have an id")
+
+    created_task = calendar_service.create_task(user_id, year, month, task)
+    return created_task
+
+
+@app.get("/api/calendar/task/{user_id}/{year}/{month}/{task_id}", response_model=CalendarTaskModel)
+async def get_calendar_task(user_id: str, year: int, month: int, task_id: str):
+    """
+    Get a specific task from calendar state
+
+    Args:
+        user_id: User ID
+        year: Year (e.g., 2025)
+        month: Month (1-12)
+        task_id: Task ID
+
+    Returns:
+        CalendarTask object or 404 if not found
+    """
+    if calendar_service is None:
+        raise HTTPException(status_code=503, detail="Calendar service not initialized")
+
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=400, detail="Month must be between 1 and 12")
+
+    task = calendar_service.get_task(user_id, year, month, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    return task
+
+
+@app.patch("/api/calendar/task/{user_id}/{year}/{month}/{task_id}", response_model=CalendarTaskModel)
+async def update_calendar_task(
+    user_id: str,
+    year: int,
+    month: int,
+    task_id: str,
+    task_update: CalendarTaskModel
+):
+    """
+    Update an existing task in calendar state
+
+    Args:
+        user_id: User ID
+        year: Year (e.g., 2025)
+        month: Month (1-12)
+        task_id: Task ID
+        task_update: Updated CalendarTask object
+
+    Returns:
+        Updated CalendarTask object or 404 if not found
+    """
+    if calendar_service is None:
+        raise HTTPException(status_code=503, detail="Calendar service not initialized")
+
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=400, detail="Month must be between 1 and 12")
+
+    updated_task = calendar_service.update_task(user_id, year, month, task_id, task_update)
+    if not updated_task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    return updated_task
+
+
+@app.delete("/api/calendar/task/{user_id}/{year}/{month}/{task_id}")
+async def delete_calendar_task(user_id: str, year: int, month: int, task_id: str):
+    """
+    Delete a task from calendar state
+
+    Args:
+        user_id: User ID
+        year: Year (e.g., 2025)
+        month: Month (1-12)
+        task_id: Task ID
+
+    Returns:
+        Success message or 404 if not found
+    """
+    if calendar_service is None:
+        raise HTTPException(status_code=503, detail="Calendar service not initialized")
+
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=400, detail="Month must be between 1 and 12")
+
+    deleted = calendar_service.delete_task(user_id, year, month, task_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    return {"success": True, "message": "Task deleted successfully"}
+
+
+@app.delete("/api/calendar/state/{user_id}/{year}/{month}")
+async def delete_calendar_state(user_id: str, year: int, month: int):
+    """
+    Delete entire calendar state for a month
+
+    Args:
+        user_id: User ID
+        year: Year (e.g., 2025)
+        month: Month (1-12)
+
+    Returns:
+        Success message or 404 if not found
+    """
+    if calendar_service is None:
+        raise HTTPException(status_code=503, detail="Calendar service not initialized")
+
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=400, detail="Month must be between 1 and 12")
+
+    deleted = calendar_service.delete_state(user_id, year, month)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Calendar state not found")
+
+    return {"success": True, "message": "Calendar state deleted successfully"}
+
 # ==================== PROJECTS ENDPOINTS ====================
 
 @app.get("/api/projects", response_model=List[Project])
 async def get_projects():
     """Get all projects"""
-    return mock_projects
+    if project_service is None:
+        print(f"DEBUG: get_projects - returning mock_projects ({len(mock_projects)} projects)")
+        return mock_projects
+    projects = project_service.get_all_projects()
+    print(f"DEBUG: get_projects - returning {len(projects)} projects from project_service")
+    return projects
 
 @app.post("/api/projects", response_model=Project)
-async def create_project(project: Project):
+async def create_project(request: CreateProjectRequest):
     """Create new project"""
-    if not project.id:
-        project.id = f"proj-{len(mock_projects) + 1}"
-    if not project.created_at:
-        project.created_at = datetime.now().isoformat()
-    mock_projects.append(project)
+    print(f"DEBUG: Creating project with name={request.name}")
+
+    if project_service is None:
+        print(f"WARNING: project_service is None, using mock data")
+        project = Project(
+            id=f"proj-{len(mock_projects) + 1}",
+            name=request.name,
+            created_at=datetime.now().isoformat()
+        )
+        mock_projects.append(project)
+        print(f"DEBUG: Created mock project: {project.id}")
+        return project
+
+    print(f"DEBUG: Using project_service.create_project()")
+    project = project_service.create_project(request.name)
+    print(f"DEBUG: Created project: {project.id}")
     return project
 
 # ==================== CHATS ENDPOINTS ====================
@@ -346,19 +611,52 @@ async def create_project(project: Project):
 @app.get("/api/chats", response_model=List[Chat])
 async def get_chats(project_id: Optional[str] = None):
     """Get all chats, optionally filtered by project"""
+    print(f"DEBUG: get_chats called with project_id={project_id}")
+
+    if project_service is None:
+        print(f"DEBUG: get_chats - using mock_chats")
+        if project_id:
+            result = [c for c in mock_chats if c.project_id == project_id]
+            print(f"DEBUG: get_chats - found {len(result)} chats for project {project_id}")
+            return result
+        print(f"DEBUG: get_chats - returning all {len(mock_chats)} mock chats")
+        return mock_chats
+
     if project_id:
-        return [c for c in mock_chats if c.project_id == project_id]
-    return mock_chats
+        print(f"DEBUG: get_chats - using project_service.get_project_chats({project_id})")
+        chats = project_service.get_project_chats(project_id)
+    else:
+        # Get all chats from all projects
+        print(f"DEBUG: get_chats - getting all chats from project_service")
+        chats = list(project_service.chats.values())
+
+    print(f"DEBUG: get_chats - returning {len(chats)} chats")
+    return chats
 
 @app.post("/api/chats", response_model=Chat)
-async def create_chat(chat: Chat):
+async def create_chat(request: CreateChatRequest):
     """Create new chat"""
-    if not chat.id:
-        chat.id = f"chat-{len(mock_chats) + 1}"
-    if not chat.created_at:
-        chat.created_at = datetime.now().isoformat()
-    mock_chats.append(chat)
-    mock_messages[chat.id] = []
+    print(f"DEBUG: Creating chat with project_id={request.project_id}, name={request.name}")
+
+    if project_service is None:
+        print(f"WARNING: project_service is None, using mock data")
+        chat = Chat(
+            id=f"chat-{len(mock_chats) + 1}",
+            project_id=request.project_id,
+            name=request.name,
+            created_at=datetime.now().isoformat()
+        )
+        mock_chats.append(chat)
+        mock_messages[chat.id] = []
+        print(f"DEBUG: Created mock chat: {chat.id}")
+        return chat
+
+    print(f"DEBUG: Using project_service.create_chat()")
+    chat = project_service.create_chat(request.project_id, request.name)
+    if chat is None:
+        print(f"ERROR: Project not found: {request.project_id}")
+        raise HTTPException(status_code=404, detail="Project not found")
+    print(f"DEBUG: Created chat: {chat.id}")
     return chat
 
 @app.get("/api/chats/graph", response_model=ChatGraph)
@@ -371,22 +669,35 @@ async def get_chat_graph():
 @app.get("/api/chats/{chat_id}/messages", response_model=List[Message])
 async def get_messages(chat_id: str):
     """Get all messages in a chat"""
-    return mock_messages.get(chat_id, [])
+    if project_service is None:
+        return mock_messages.get(chat_id, [])
+    return project_service.get_chat_messages(chat_id)
 
 @app.post("/api/chats/{chat_id}/messages", response_model=Message)
-async def create_message(chat_id: str, content: str, role: str = "user"):
+async def create_message(chat_id: str, request: CreateMessageRequest):
     """Create a new message"""
-    if chat_id not in mock_messages:
-        mock_messages[chat_id] = []
+    print(f"DEBUG: Creating message in chat {chat_id}")
 
-    message = Message(
-        id=f"msg-{len(mock_messages[chat_id]) + 1}",
-        chat_id=chat_id,
-        content=content,
-        role=role,
-        timestamp=datetime.now().isoformat()
-    )
-    mock_messages[chat_id].append(message)
+    if project_service is None:
+        print(f"DEBUG: Using mock_messages")
+        if chat_id not in mock_messages:
+            mock_messages[chat_id] = []
+
+        message = Message(
+            id=f"msg-{len(mock_messages[chat_id]) + 1}",
+            chat_id=chat_id,
+            content=request.content,
+            role=request.role,
+            timestamp=datetime.now().isoformat()
+        )
+        mock_messages[chat_id].append(message)
+        return message
+
+    print(f"DEBUG: Using project_service.add_message()")
+    message = project_service.add_message(chat_id, request.content, request.role)
+    if message is None:
+        print(f"ERROR: Chat not found: {chat_id}")
+        raise HTTPException(status_code=404, detail="Chat not found")
     return message
 
 # ==================== WEBSOCKET FOR CHAT STREAMING ====================
@@ -424,16 +735,27 @@ async def websocket_endpoint(websocket: WebSocket, chat_id: str):
             user_content = message_data.get("content", "")
 
             # Save user message
-            user_message = Message(
-                id=f"msg-{datetime.now().timestamp()}",
-                chat_id=chat_id,
-                content=user_content,
-                role="user",
-                timestamp=datetime.now().isoformat()
-            )
-            if chat_id not in mock_messages:
-                mock_messages[chat_id] = []
-            mock_messages[chat_id].append(user_message)
+            if project_service is None:
+                user_message = Message(
+                    id=f"msg-{datetime.now().timestamp()}",
+                    chat_id=chat_id,
+                    content=user_content,
+                    role="user",
+                    timestamp=datetime.now().isoformat()
+                )
+                if chat_id not in mock_messages:
+                    mock_messages[chat_id] = []
+                mock_messages[chat_id].append(user_message)
+                chat_messages = mock_messages[chat_id]
+            else:
+                user_message = project_service.add_message(chat_id, user_content, "user")
+                if user_message is None:
+                    await websocket.send_text(json.dumps({
+                        "type": "error",
+                        "message": "Chat not found"
+                    }))
+                    return
+                chat_messages = project_service.get_chat_messages(chat_id)
 
             # Send user message confirmation
             await websocket.send_text(json.dumps({
@@ -448,7 +770,7 @@ async def websocket_endpoint(websocket: WebSocket, chat_id: str):
                     "content": "Ты полезный ассистент для студентов. Помогаешь с учебой, отвечаешь на вопросы и даешь советы."
                 }
             ]
-            for msg in mock_messages[chat_id][-10:]:
+            for msg in chat_messages[-10:]:
                 messages.append({
                     "role": msg.role,
                     "content": msg.content
@@ -491,14 +813,26 @@ async def websocket_endpoint(websocket: WebSocket, chat_id: str):
                 }))
 
             # Save assistant message
-            assistant_message = Message(
-                id=assistant_msg_id,
-                chat_id=chat_id,
-                content=full_response,
-                role="assistant",
-                timestamp=datetime.now().isoformat()
-            )
-            mock_messages[chat_id].append(assistant_message)
+            if project_service is None:
+                assistant_message = Message(
+                    id=assistant_msg_id,
+                    chat_id=chat_id,
+                    content=full_response,
+                    role="assistant",
+                    timestamp=datetime.now().isoformat()
+                )
+                mock_messages[chat_id].append(assistant_message)
+            else:
+                assistant_message = project_service.add_message(chat_id, full_response, "assistant")
+                if assistant_message is None:
+                    # Chat doesn't exist anymore, just send the message
+                    assistant_message = Message(
+                        id=assistant_msg_id,
+                        chat_id=chat_id,
+                        content=full_response,
+                        role="assistant",
+                        timestamp=datetime.now().isoformat()
+                    )
 
             # Send end of assistant message
             await websocket.send_text(json.dumps({
@@ -544,6 +878,98 @@ async def update_llm_config(config: LLMConfigUpdate):
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to update config: {str(e)}")
+
+# ==================== DOCUMENTS ENDPOINTS ====================
+
+@app.post("/api/projects/{project_id}/documents", response_model=Document)
+async def upload_document(
+    project_id: str,
+    file: UploadFile = File(...),
+    user_id: str = "user-1"  # In production, get from auth token
+):
+    """Upload document to project"""
+    try:
+        if not file or not file.filename:
+            raise HTTPException(status_code=400, detail="No file provided")
+
+        # Create uploads directory if it doesn't exist
+        upload_dir = f"uploads/{user_id}/{project_id}"
+        os.makedirs(upload_dir, exist_ok=True)
+
+        # Read file content
+        file_content = await file.read()
+        if not file_content:
+            raise HTTPException(status_code=400, detail="File is empty")
+
+        # Save file to disk
+        file_path = os.path.join(upload_dir, file.filename)
+        with open(file_path, "wb") as f:
+            f.write(file_content)
+
+        # Create document record
+        document = Document(
+            id=f"doc-{datetime.now().timestamp()}",
+            project_id=project_id,
+            filename=file.filename,
+            file_size=len(file_content),
+            uploaded_at=datetime.now().isoformat(),
+            uploaded_by_user=user_id
+        )
+
+        # Store in mock storage
+        if project_id not in mock_documents:
+            mock_documents[project_id] = []
+        mock_documents[project_id].append(document)
+
+        print(f"✓ Document uploaded: {file.filename} ({len(file_content)} bytes)")
+        return document
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_message = str(e)
+        print(f"✗ Document upload error: {error_message}")
+        raise HTTPException(status_code=500, detail=f"Failed to upload document: {error_message}")
+
+
+@app.get("/api/projects/{project_id}/documents", response_model=List[Document])
+async def get_project_documents(project_id: str):
+    """Get all documents for a project"""
+    documents = mock_documents.get(project_id, [])
+    return sorted(documents, key=lambda x: x.uploaded_at, reverse=True)
+
+
+@app.delete("/api/projects/{project_id}/documents/{document_id}")
+async def delete_document(project_id: str, document_id: str, user_id: str = "user-1"):
+    """Delete document from project"""
+    try:
+        if project_id not in mock_documents:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        # Find and remove document
+        documents = mock_documents[project_id]
+        document = next((d for d in documents if d.id == document_id), None)
+
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        # Delete file from disk
+        file_path = f"uploads/{user_id}/{project_id}/{document.filename}"
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+        # Remove from mock storage
+        mock_documents[project_id] = [d for d in documents if d.id != document_id]
+
+        print(f"✓ Document deleted: {document.filename}")
+        return {"success": True, "message": "Document deleted"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_message = str(e)
+        print(f"✗ Document deletion error: {error_message}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete document: {error_message}")
 
 # ==================== HEALTH CHECK ====================
 

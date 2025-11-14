@@ -149,6 +149,78 @@ class ApiService {
   async getChatConnections(chatId: string): Promise<GraphData> {
     return this.request<GraphData>(`/chats/${chatId}/connections`)
   }
+
+  // Documents API
+  async uploadDocument(projectId: string, file: File): Promise<any> {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const url = `${API_BASE_URL}/projects/${projectId}/documents`
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.detail || 'Failed to upload document')
+    }
+
+    return await response.json()
+  }
+
+  async getProjectDocuments(projectId: string): Promise<any[]> {
+    return this.request<any[]>(`/projects/${projectId}/documents`)
+  }
+
+  async deleteDocument(projectId: string, documentId: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/projects/${projectId}/documents/${documentId}`, {
+      method: 'DELETE',
+    })
+  }
+
+  // Calendar API
+  async getCalendarState(userId: string, year: number, month: number): Promise<any> {
+    return this.request<any>(`/calendar/state/${userId}/${year}/${month}`)
+  }
+
+  async getCalendarTasks(userId: string, year: number, month: number): Promise<Task[]> {
+    return this.request<Task[]>(`/calendar/tasks/${userId}/${year}/${month}`)
+  }
+
+  async getAllCalendarTasks(userId: string): Promise<Task[]> {
+    return this.request<Task[]>(`/calendar/all-tasks/${userId}`)
+  }
+
+  async createCalendarTask(userId: string, year: number, month: number, task: Task): Promise<Task> {
+    return this.request<Task>(`/calendar/task/${userId}/${year}/${month}`, {
+      method: 'POST',
+      body: JSON.stringify(task),
+    })
+  }
+
+  async getCalendarTask(userId: string, year: number, month: number, taskId: string): Promise<Task> {
+    return this.request<Task>(`/calendar/task/${userId}/${year}/${month}/${taskId}`)
+  }
+
+  async updateCalendarTask(userId: string, year: number, month: number, taskId: string, task: Task): Promise<Task> {
+    return this.request<Task>(`/calendar/task/${userId}/${year}/${month}/${taskId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(task),
+    })
+  }
+
+  async deleteCalendarTask(userId: string, year: number, month: number, taskId: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/calendar/task/${userId}/${year}/${month}/${taskId}`, {
+      method: 'DELETE',
+    })
+  }
+
+  async deleteCalendarState(userId: string, year: number, month: number): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/calendar/state/${userId}/${year}/${month}`, {
+      method: 'DELETE',
+    })
+  }
 }
 
 export const apiService = new ApiService()
