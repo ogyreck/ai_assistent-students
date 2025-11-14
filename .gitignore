@@ -3,6 +3,7 @@
 .env.local
 .env.*.local
 *.env
+server/.venv
 
 # IDE and editors
 .vscode/
@@ -65,3 +66,4 @@ temp/
 # Local configuration
 config.local.*
 settings.local.*
+server/src/config.yml

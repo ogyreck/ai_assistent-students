@@ -1,7 +1,7 @@
 llm:
   url: https://openrouter.ai/api/v1
   model: qwen/qwen3-32b
-  token: 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
+  token: TOKEN
 
 logging:
     app_name: RAG-bot

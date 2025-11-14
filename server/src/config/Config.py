@@ -22,14 +22,6 @@ class LoggingConfig:
     root_level: str
     levels: dict[str, str]
 
-@dataclass
-class QdrantConfig:
-    host: str
-    port: int
-    collection_name: str
-    model_name: str
-    vector_size: int
-    top_samples: int
 
 @dataclass
 class LLMConfig:
@@ -40,7 +32,6 @@ class LLMConfig:
 @dataclass
 class Config:
     llm: LLMConfig
-    qdrant: QdrantConfig
     logging: LoggingConfig
 
 class ConfigLoader:
