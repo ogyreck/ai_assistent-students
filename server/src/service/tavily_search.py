@@ -3,6 +3,7 @@ import logging
 from tavily import AsyncTavilyClient
 
 from server.src.config.Config import CONFIG
+from server.src.models import SourceData
 
 logger = logging.getLogger(__name__)
 
