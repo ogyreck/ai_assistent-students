@@ -3,17 +3,10 @@ llm:
   model: qwen/qwen3-32b
   token: TOKEN
 
-logging:
-    app_name: RAG-bot
-    graylog:
-      enabled: false
-      udp: false
-      host: 0.0.0.0
-      port: 12201
-    console:
-      enabled: true
-    root_level: INFO
-    levels:
-      httpx: WARN
-      openai: WARN
-      uvicorn.access: WARN
+# Search Configuration (Tavily)
+search:
+  tavily_api_key: "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"  # Tavily API key (get at tavily.com)
+  tavily_api_base_url: "https://api.tavily.com"  # Tavily API URL
+  max_results: 10  # Max search results
+  max_pages: 5  # Max pages to scrape
+  content_limit: 1500  # Content char limit per source
