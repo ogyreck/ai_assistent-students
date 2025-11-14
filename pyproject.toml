@@ -1,0 +1,78 @@
+[project]
+name = "cynteka-goods"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "dacite>=1.9.2",
+    "faiss-cpu>=1.11.0",
+    "fastapi>=0.115.11",
+    "graypy>=2.1.0",
+    "jinja2>=3.1.6",
+    "jsonschema>=4.23.0",
+    "openai>=1.67.0",
+    "psycopg2-binary>=2.9.10",
+    "python-box>=7.3.2",
+    "pyyaml>=6.0.2",
+    "sqlalchemy>=2.0.41",
+    "uvicorn>=0.34.0",
+    "whoosh>=2.7.4",
+    "yoyo-migrations>=9.0.0",
+    "psycopg2-binary>=2.9.10",
+    "APScheduler>=3.11.0",
+    "openpyxl>=3.1.5",
+]
+
+[dependency-groups]
+dev = [
+    "beautifulsoup4>=4.13.3",
+    "lxml>=5.3.1",
+    "pyright>=1.1.397",
+    "pytest>=8.3.5",
+    "pytest-asyncio>=0.25.3",
+    "pytest-cov>=6.0.0",
+    "pytest-html>=4.1.1",
+    "pandas>=2.3.0",
+    "ruff>=0.11.0",
+    "pre-commit>=4.2.0",
+]
+
+[tool.ruff]
+line-length = 160
+target-version = "py313"
+exclude = [
+    "src/endpoints/apis",
+    "src/endpoints/models",
+    "src/router_init.py",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "I"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[tool.pytest.ini_options]
+pythonpath = ["./src", "./tests"]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+log_cli = true
+log_cli_level = "DEBUG"
+addopts = "--cov=./src --cov-report=term --cov-report=html --html=pytest-report/index.html"
+
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+typeCheckingMode = "strict"
+exclude = [
+    "src/endpoints/apis/**",
+    "src/endpoints/models/**",
+    "src/endpoints/router_init.py",
+]
+include =  [
+    "src"
+]
