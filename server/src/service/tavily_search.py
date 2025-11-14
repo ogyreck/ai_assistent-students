@@ -2,14 +2,16 @@ import logging
 
 from tavily import AsyncTavilyClient
 
+from server.src.config.Config import CONFIG
+
 logger = logging.getLogger(__name__)
 
 
 class TavilySearchService:
     def __init__(self):
-        config = GlobalConfig()
+        config = CONFIG
         self._client = AsyncTavilyClient(
-            api_key=config.search.tavily_api_key, api_base_url=config.search.tavily_api_base_url
+            api_key=config.search.tavily_api_key
         )
         self._config = config
 
