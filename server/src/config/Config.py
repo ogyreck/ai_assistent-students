@@ -3,26 +3,6 @@ from dataclasses import dataclass, fields, is_dataclass
 import yaml
 
 @dataclass
-class LoggingConfigConsole:
-    enabled: bool
-
-@dataclass
-class LoggingConfigGraylog:
-    enabled: bool
-    host: str
-    port: int
-    udp: bool
-
-
-@dataclass
-class LoggingConfig:
-    console: LoggingConfigConsole
-    graylog: LoggingConfigGraylog
-    app_name: str
-    root_level: str
-    levels: dict[str, str]
-
-@dataclass
 class QdrantConfig:
     host: str
     port: int
@@ -38,10 +18,18 @@ class LLMConfig:
     model: str
 
 @dataclass
+class SearchConfig:
+    tavily_api_key: str
+    tavily_api_base_url: str
+    max_results: int
+    max_pages: int
+    content_limit: int
+
+@dataclass
 class Config:
     llm: LLMConfig
     qdrant: QdrantConfig
-    logging: LoggingConfig
+    search: SearchConfig
 
 class ConfigLoader:
 
