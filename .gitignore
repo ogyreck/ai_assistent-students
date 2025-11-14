@@ -67,6 +67,8 @@ config.local.*
 settings.local.*
 
 # Transcript app
-transcript/transcriptions.json
-transcript/temp/
-transcript/.env
+server/transcript/transcriptions.json
+server/transcript/temp/
+server/transcript/.env
+transcript/*.mp3
+

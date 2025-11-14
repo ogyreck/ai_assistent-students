@@ -4,6 +4,10 @@
 import os
 from pathlib import Path
 from typing import Optional
+from dotenv import load_dotenv
+
+# Загружаем переменные из .env файла
+load_dotenv()
 
 # Базовая директория проекта
 BASE_DIR = Path(__file__).parent

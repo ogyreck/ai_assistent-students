@@ -76,7 +76,7 @@ python main.py --help
 ### Из Python кода
 
 ```python
-from transcript import process_audio_file
+from server.transcript import process_audio_file
 
 # Базовое использование
 result = process_audio_file("AlGore_2006.mp3")
@@ -90,7 +90,7 @@ result = process_audio_file(
 )
 
 # Использование отдельных модулей
-from transcript import WhisperClient, OpenRouterClient
+from server.transcript import WhisperClient, OpenRouterClient
 
 # Только транскрипция
 whisper = WhisperClient()
