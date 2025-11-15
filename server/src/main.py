@@ -8,6 +8,7 @@ import asyncio
 import base64
 import sys
 import os
+import httpx
 
 # Add current directory to path for imports
 sys.path.insert(0, os.getcwd())
@@ -18,6 +19,7 @@ try:
     from service.whisper_service import create_whisper_transcriber
     from service.calendar_service import CalendarService
     from service.project_service import ProjectService
+    from service.document_parser import DocumentTextExtractor
 
     # Initialize LLM client from config
     llm_client = create_llm_client(
@@ -46,6 +48,10 @@ try:
     project_service = ProjectService(storage_dir="project_storage")
     print(f"✓ Project Service initialized successfully")
 
+    # Initialize Document Text Extractor
+    document_extractor = DocumentTextExtractor()
+    print(f"✓ Document Text Extractor initialized successfully")
+
 except Exception as e:
     print(f"✗ Error loading config or initializing services:")
     print(f"  {e}")
@@ -56,6 +62,7 @@ except Exception as e:
     whisper_transcriber = None
     calendar_service = None
     project_service = None
+    document_extractor = None
 
 app = FastAPI(title="Student Assistant API")
 
@@ -140,7 +147,7 @@ class CreateMessageRequest(BaseModel):
 
 mock_user = User(
     id="user-1",
-    name="20= 20=>2",
+    name="Иван Иванов",
     email="ivan@example.com",
     avatar_url=None
 )
@@ -227,11 +234,12 @@ async def update_user(name: Optional[str] = None, email: Optional[str] = None):
 @app.post("/api/user/avatar")
 async def upload_avatar(file: UploadFile = File(...)):
     """Upload user avatar"""
-    # Mock: just return a fake URL
-    # In production, save file and return actual URL
     contents = await file.read()
-    # Simulate saving avatar
-    mock_user.avatar_url = f"data:image/png;base64,{base64.b64encode(contents[:100]).decode()}"
+
+    mime_type = file.content_type or "image/png"
+    base64_data = base64.b64encode(contents).decode()
+    mock_user.avatar_url = f"data:{mime_type};base64,{base64_data}"
+
     return {"url": mock_user.avatar_url}
 
 # ==================== TRANSCRIPTION ====================
@@ -763,11 +771,31 @@ async def websocket_endpoint(websocket: WebSocket, chat_id: str):
                 "message": user_message.dict()
             }))
 
+            rag_context = ""
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    rag_response = await client.get(
+                        "http://147.45.224.7:6500/api/get_answer",
+                        params={"user_question": user_content}
+                    )
+                    if rag_response.status_code == 200:
+                        rag_data = rag_response.json()
+                        rag_answer = rag_data.get("answer", "")
+                        if rag_answer:
+                            rag_context = f"\n\nИнформация из базы знаний: {rag_answer}"
+                            print(f"✓ RAG context added: {rag_answer[:100]}...")
+            except Exception as e:
+                print(f"⚠ RAG request failed: {e}")
+
             # Build conversation history (last 10 messages)
+            system_prompt = "Ты полезный ассистент для студентов. Помогаешь с учебой, отвечаешь на вопросы и даешь советы."
+            if rag_context:
+                system_prompt += rag_context
+
             messages = [
                 {
                     "role": "system",
-                    "content": "Ты полезный ассистент для студентов. Помогаешь с учебой, отвечаешь на вопросы и даешь советы."
+                    "content": system_prompt
                 }
             ]
             for msg in chat_messages[-10:]:
@@ -922,6 +950,30 @@ async def upload_document(
         mock_documents[project_id].append(document)
 
         print(f"✓ Document uploaded: {file.filename} ({len(file_content)} bytes)")
+
+        if document_extractor is not None:
+            try:
+                extracted_text = document_extractor(file_content, file.filename)
+                if extracted_text and len(extracted_text.strip()) > 0:
+                    print(f"📄 Extracted text from {file.filename}: {len(extracted_text)} characters")
+
+                    async with httpx.AsyncClient(timeout=30.0) as client:
+                        rag_upload_response = await client.post(
+                            "http://147.45.224.7:6500/api/upload_text",
+                            json={
+                                "text": extracted_text,
+                                "title": f"{file.filename} (Project: {project_id})"
+                            }
+                        )
+                        if rag_upload_response.status_code == 200:
+                            print(f"✓ Document text uploaded to RAG: {file.filename}")
+                        else:
+                            print(f"⚠ RAG upload failed with status {rag_upload_response.status_code}")
+                else:
+                    print(f"⚠ No text extracted from {file.filename}")
+            except Exception as e:
+                print(f"⚠ Failed to extract text or upload to RAG: {e}")
+
         return document
 
     except HTTPException:

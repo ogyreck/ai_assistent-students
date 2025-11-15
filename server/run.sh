@@ -12,4 +12,4 @@ echo ""
 
 # Run the server from src directory so it can find config.yml
 cd src
-python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+../.venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload

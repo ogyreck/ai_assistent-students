@@ -276,6 +276,7 @@ onUnmounted(() => {
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
+  background: #f5f7fa;
 }
 
 .chat-content {
@@ -283,15 +284,18 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
 }
 
 .messages-container {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: 32px 24px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
 }
 
 .no-messages {
@@ -301,13 +305,26 @@ onUnmounted(() => {
   justify-content: center;
   color: #999;
   font-size: 16px;
+  text-align: center;
 }
 
 .message {
   display: flex;
   flex-direction: column;
-  max-width: 70%;
-  gap: 4px;
+  max-width: 75%;
+  gap: 6px;
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .message.user {
@@ -319,29 +336,33 @@ onUnmounted(() => {
 }
 
 .message-content {
-  padding: 12px 16px;
-  border-radius: 12px;
+  padding: 14px 18px;
+  border-radius: 16px;
   font-size: 15px;
-  line-height: 1.5;
+  line-height: 1.6;
   word-wrap: break-word;
+  white-space: pre-wrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .message.user .message-content {
-  background: #1967d2;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border-bottom-right-radius: 4px;
 }
 
 .message.assistant .message-content {
-  background: #f0f0f0;
-  color: #333;
+  background: white;
+  color: #2d3748;
   border-bottom-left-radius: 4px;
+  border: 1px solid #e2e8f0;
 }
 
 .message-time {
   font-size: 11px;
-  color: #999;
+  color: #a0aec0;
   padding: 0 8px;
+  font-weight: 500;
 }
 
 .message.user .message-time {
@@ -352,41 +373,43 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 20px;
-  background: white;
-  border-top: 1px solid #e0e0e0;
+  padding: 20px 24px 24px;
+  background: transparent;
 }
 
 .attach-btn,
 .voice-btn {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border: none;
-  background: #f0f0f0;
+  background: white;
   border-radius: 50%;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #666;
-  transition: all 0.2s;
+  color: #718096;
+  transition: all 0.2s ease;
   flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
 }
 
 .attach-btn:hover,
 .voice-btn:hover {
-  background: #e0e0e0;
-  color: #333;
+  background: #f7fafc;
+  color: #4a5568;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .voice-btn.recording {
-  background: #ff5252;
+  background: #fc8181;
   color: white;
-  animation: pulse 1s infinite;
+  animation: pulse 1.5s infinite;
 }
 
 .voice-btn.recording:hover {
-  background: #ff1744;
+  background: #f56565;
 }
 
 .recording-indicator {
@@ -397,31 +420,34 @@ onUnmounted(() => {
 
 @keyframes pulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(255, 82, 82, 0.7);
+    box-shadow: 0 0 0 0 rgba(252, 129, 129, 0.7);
   }
   70% {
-    box-shadow: 0 0 0 8px rgba(255, 82, 82, 0);
+    box-shadow: 0 0 0 12px rgba(252, 129, 129, 0);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(255, 82, 82, 0);
+    box-shadow: 0 0 0 0 rgba(252, 129, 129, 0);
   }
 }
 
 .message-input {
   flex: 1;
-  padding: 12px 16px;
-  border: 1px solid #e0e0e0;
-  border-radius: 20px;
+  padding: 14px 20px;
+  border: 2px solid #e2e8f0;
+  border-radius: 24px;
   font-size: 15px;
   outline: none;
-  transition: border-color 0.2s;
+  transition: all 0.2s ease;
+  background: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
 }
 
 .message-input:focus {
-  border-color: #1967d2;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1), 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .message-input::placeholder {
-  color: #999;
+  color: #a0aec0;
 }
 </style>
