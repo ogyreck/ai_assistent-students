@@ -1,4 +1,23 @@
 from pydantic import BaseModel, Field
+from typing import Any
+import asyncio
+from enum import Enum
+
+
+class AgentStatesEnum(str, Enum):
+    """Agent state enumeration"""
+    INITED = "inited"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    ERROR = "error"
+
+
+class SearchResult(BaseModel):
+    """Search result data"""
+    query: str
+    answer: str | None = None
+    citations: list = Field(default_factory=list)
+    timestamp: Any = None
 
 
 class SourceData(BaseModel):

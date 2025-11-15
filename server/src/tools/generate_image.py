@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING
 
 from pydantic import Field
 
-from server.src.service.llm_client import LLMClient
+from service.llm_client import LLMClient
 
 if TYPE_CHECKING:
-    from server.src.context.research_context import ResearchContext
+    from context.research_context import ResearchContext
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

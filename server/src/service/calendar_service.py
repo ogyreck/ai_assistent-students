@@ -91,7 +91,7 @@ class CalendarService:
                 state.month
             )
             with open(filepath, 'w', encoding='utf-8') as f:
-                json.dump(state.dict(), f, ensure_ascii=False, indent=2)
+                json.dump(state.model_dump(), f, ensure_ascii=False, indent=2)
         except Exception as e:
             print(f"Error saving calendar state: {e}")
             raise
@@ -175,7 +175,7 @@ class CalendarService:
         """
         state = self.get_or_create_state(user_id, year, month)
 
-        task_dict = task.dict()
+        task_dict = task.model_dump()
         state.tasks.append(task_dict)
         state.updated_at = datetime.now().isoformat()
 
@@ -245,7 +245,7 @@ class CalendarService:
         if task_index is None:
             return None
 
-        state.tasks[task_index] = task_update.dict()
+        state.tasks[task_index] = task_update.model_dump()
         state.updated_at = datetime.now().isoformat()
 
         self._save_state(state)

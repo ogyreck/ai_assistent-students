@@ -7,7 +7,7 @@ import httpx
 from pydantic import Field
 
 if TYPE_CHECKING:
-    from server.src.context.research_context import ResearchContext
+    from context.research_context import ResearchContext
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

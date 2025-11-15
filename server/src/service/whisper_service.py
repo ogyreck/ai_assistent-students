@@ -19,7 +19,7 @@ import aiohttp
 import json
 import asyncio
 
-from server.src.config.Config import CONFIG
+from config.Config import CONFIG
 
 logger = logging.getLogger(__name__)
 

@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 
 from pydantic import Field
 
-from server.src.config.Config import CONFIG
-from server.src.service.tavily_search import TavilySearchService
+from config.Config import CONFIG
+from service.tavily_search import TavilySearchService
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

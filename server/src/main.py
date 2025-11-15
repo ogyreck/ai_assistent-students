@@ -20,6 +20,7 @@ try:
     from service.calendar_service import CalendarService
     from service.project_service import ProjectService
     from service.document_parser import DocumentTextExtractor
+    from tools.agent_tools import CalendarTool, WebSearchTool, ReActAgent
 
     # Initialize LLM client from config
     llm_client = create_llm_client(
@@ -768,7 +769,7 @@ async def websocket_endpoint(websocket: WebSocket, chat_id: str):
             # Send user message confirmation
             await websocket.send_text(json.dumps({
                 "type": "user_message",
-                "message": user_message.dict()
+                "message": user_message.model_dump()
             }))
 
             rag_context = ""
@@ -788,7 +789,22 @@ async def websocket_endpoint(websocket: WebSocket, chat_id: str):
                 print(f"⚠ RAG request failed: {e}")
 
             # Build conversation history (last 10 messages)
-            system_prompt = "Ты полезный ассистент для студентов. Помогаешь с учебой, отвечаешь на вопросы и даешь советы."
+            system_prompt = f"""Ты полезный ассистент для студентов. Помогаешь с учебой, отвечаешь на вопросы и даешь советы.
+
+current_time: {datetime.now().strftime("%d,%m,%y %H:%M:%S")}
+
+Ты имеешь доступ к инструментам для поиска информации:
+- КАЛЕНДАРЬ: для работы с датами, планированием, графиками
+- WEB SEARCH: для поиска актуальной информации в интернете
+
+Инструкции по использованию инструментов:
+1. Если пользователь спрашивает о датах/планировании → используй КАЛЕНДАРЬ
+2. Если нужна актуальная информация → используй WEB SEARCH
+3. После использования инструмента включи результат в ответ
+4. Будь помощным и кратким в ответе
+
+Когда у тебя достаточно информации для ответа, отправь полный ответ пользователю."""
+
             if rag_context:
                 system_prompt += rag_context
 
@@ -813,24 +829,57 @@ async def websocket_endpoint(websocket: WebSocket, chat_id: str):
                 "message_id": assistant_msg_id
             }))
 
-            # Stream response from LLM
+            # Use ReAct agent if available, otherwise fall back to direct LLM
             full_response = ""
+            tool_calls_made = []
+
             try:
                 if llm_client is None:
                     raise Exception("LLM Client not initialized. Check config.yml")
 
-                async for chunk in llm_client.chat_completion_stream(
-                    messages=messages,
-                    temperature=0.7
-                ):
-                    full_response += chunk
-                    # Send chunk to client
-                    await websocket.send_text(json.dumps({
-                        "type": "assistant_chunk",
-                        "content": chunk
-                    }))
+                # Try to use agent for tool-aware responses
+                print(f"🤖 Using ReAct Agent for user message: {user_content[:50]}...")
+
+                # Create agent instance
+                agent = ReActAgent(llm_client)
+
+                # Process message with agent
+                full_response, tool_calls_made = await agent.process_message(
+                    user_message=user_content,
+                    chat_context=messages[1:]  # Exclude system prompt for agent context
+                )
+
+                print(f"✓ Agent completed with {len(tool_calls_made)} tool calls")
+
+                # If agent used tools, stream the final response
+                if tool_calls_made:
+                    print(f"📊 Tools used: {[tc['tool'] for tc in tool_calls_made]}")
+                    # Stream response in chunks for better UX
+                    chunk_size = 50
+                    for i in range(0, len(full_response), chunk_size):
+                        chunk = full_response[i:i+chunk_size]
+                        await websocket.send_text(json.dumps({
+                            "type": "assistant_chunk",
+                            "content": chunk
+                        }))
+                        # Small delay for better streaming effect
+                        await asyncio.sleep(0.01)
+                else:
+                    # No tools used, use regular LLM streaming
+                    print("💬 No tools needed, using direct LLM streaming")
+                    async for chunk in llm_client.chat_completion_stream(
+                        messages=messages,
+                        temperature=0.7
+                    ):
+                        full_response += chunk
+                        # Send chunk to client
+                        await websocket.send_text(json.dumps({
+                            "type": "assistant_chunk",
+                            "content": chunk
+                        }))
+
             except Exception as e:
-                print(f"Error during LLM streaming: {e}")
+                print(f"Error during agent/LLM processing: {e}")
                 import traceback
                 traceback.print_exc()
                 error_message = f"Ошибка при генерации ответа: {str(e)}"
@@ -865,7 +914,7 @@ async def websocket_endpoint(websocket: WebSocket, chat_id: str):
             # Send end of assistant message
             await websocket.send_text(json.dumps({
                 "type": "assistant_end",
-                "message": assistant_message.dict()
+                "message": assistant_message.model_dump()
             }))
 
     except WebSocketDisconnect:

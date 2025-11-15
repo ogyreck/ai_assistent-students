@@ -148,7 +148,7 @@ class ProjectService:
         try:
             filepath = self._get_project_file_path(project.id)
             with open(filepath, 'w', encoding='utf-8') as f:
-                json.dump(project.dict(), f, ensure_ascii=False, indent=2)
+                json.dump(project.model_dump(), f, ensure_ascii=False, indent=2)
         except Exception as e:
             print(f"Error saving project: {e}")
             raise
@@ -158,7 +158,7 @@ class ProjectService:
         try:
             filepath = self._get_chat_file_path(chat.id)
             with open(filepath, 'w', encoding='utf-8') as f:
-                json.dump(chat.dict(), f, ensure_ascii=False, indent=2)
+                json.dump(chat.model_dump(), f, ensure_ascii=False, indent=2)
         except Exception as e:
             print(f"Error saving chat: {e}")
             raise
@@ -167,7 +167,7 @@ class ProjectService:
         """Save messages to file"""
         try:
             filepath = self._get_messages_file_path(chat_id)
-            messages_data = [msg.dict() for msg in messages]
+            messages_data = [msg.model_dump() for msg in messages]
             with open(filepath, 'w', encoding='utf-8') as f:
                 json.dump(messages_data, f, ensure_ascii=False, indent=2)
         except Exception as e:
