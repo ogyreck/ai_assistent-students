@@ -295,7 +295,7 @@ async def transcribe_audio(
             audio_data=audio_content,
             filename=audio.filename,
             language=language,
-            temperature=temperature
+            temperature=0.0
         )
 
         if result["success"]:
@@ -774,7 +774,7 @@ async def websocket_endpoint(websocket: WebSocket, chat_id: str):
 
             rag_context = ""
             try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
+                async with httpx.AsyncClient(timeout=30.0) as client:
                     rag_response = await client.get(
                         "http://147.45.224.7:6500/api/get_answer",
                         params={"user_question": user_content}
@@ -803,7 +803,10 @@ current_time: {datetime.now().strftime("%d,%m,%y %H:%M:%S")}
 3. После использования инструмента включи результат в ответ
 4. Будь помощным и кратким в ответе
 
-Когда у тебя достаточно информации для ответа, отправь полный ответ пользователю."""
+Когда у тебя достаточно информации для ответа, отправь полный ответ пользователю.
+
+В конце обязательно вызови финальный ответ, если надо сделать какой то поиск просто сразу делай, просто после ответа вызови финальный ответ
+"""
 
             if rag_context:
                 system_prompt += rag_context
@@ -851,10 +854,11 @@ current_time: {datetime.now().strftime("%d,%m,%y %H:%M:%S")}
 
                 print(f"✓ Agent completed with {len(tool_calls_made)} tool calls")
 
-                # If agent used tools, stream the final response
-                if tool_calls_made:
-                    print(f"📊 Tools used: {[tc['tool'] for tc in tool_calls_made]}")
-                    # Stream response in chunks for better UX
+                # Stream the agent's response to client in chunks
+                print(f"📤 Streaming response ({len(full_response)} chars) to client")
+
+                # Always stream the full_response from agent (whether tools were used or not)
+                if full_response:
                     chunk_size = 50
                     for i in range(0, len(full_response), chunk_size):
                         chunk = full_response[i:i+chunk_size]
@@ -864,19 +868,17 @@ current_time: {datetime.now().strftime("%d,%m,%y %H:%M:%S")}
                         }))
                         # Small delay for better streaming effect
                         await asyncio.sleep(0.01)
+
+                    if tool_calls_made:
+                        print(f"📊 Tools used: {[tc['tool'] for tc in tool_calls_made]}")
                 else:
-                    # No tools used, use regular LLM streaming
-                    print("💬 No tools needed, using direct LLM streaming")
-                    async for chunk in llm_client.chat_completion_stream(
-                        messages=messages,
-                        temperature=0.7
-                    ):
-                        full_response += chunk
-                        # Send chunk to client
-                        await websocket.send_text(json.dumps({
-                            "type": "assistant_chunk",
-                            "content": chunk
-                        }))
+                    # If no response, something went wrong
+                    print("⚠️ Agent returned empty response")
+                    full_response = "Извините, не удалось обработать ваш запрос."
+                    await websocket.send_text(json.dumps({
+                        "type": "assistant_chunk",
+                        "content": full_response
+                    }))
 
             except Exception as e:
                 print(f"Error during agent/LLM processing: {e}")

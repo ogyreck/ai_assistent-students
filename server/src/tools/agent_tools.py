@@ -8,6 +8,8 @@ from typing import Any, Dict, Optional
 import json
 import httpx
 import logging
+import asyncio
+import time
 
 from config.Config import CONFIG
 from service.tavily_search import TavilySearchService
@@ -265,19 +267,31 @@ class ReActAgent:
         self.max_iterations = 10  # Prevent infinite loops
         self.current_iteration = 0
         self.tool_history = []
+        self.start_time = None
+        self.timeout_seconds = 40  # 40 second timeout
+        self.accumulated_response = ""  # Store responses in case of timeout
 
     async def process_message(self, user_message: str, chat_context: list) -> tuple[str, list]:
         """
         Process user message and autonomously decide whether to use tools.
+        If agent doesn't return FINAL_ANSWER within 40 seconds, returns accumulated response.
 
         Returns:
             (final_response, tool_calls_made)
         """
         self.current_iteration = 0
         self.tool_history = []
+        self.start_time = time.time()
+        self.accumulated_response = ""
 
         while self.current_iteration < self.max_iterations:
             self.current_iteration += 1
+
+            # Check if timeout exceeded
+            elapsed_time = time.time() - self.start_time
+            if elapsed_time > self.timeout_seconds:
+                logger.warning(f"⏱️ Agent timeout exceeded ({elapsed_time:.1f}s > {self.timeout_seconds}s). Returning accumulated response.")
+                return self._handle_timeout_response(), self.tool_history
 
             # Build system prompt for agent decision-making
             system_prompt = self._build_agent_system_prompt()
@@ -288,6 +302,9 @@ class ReActAgent:
                 user_message,
                 chat_context
             )
+
+            # Store the response
+            self.accumulated_response = thought_response
 
             # Parse agent response for tool calls or final answer
             action, action_input = self._parse_agent_response(thought_response)
@@ -313,12 +330,13 @@ class ReActAgent:
                 })
 
             else:
-                # Unknown action, break loop
-                logger.warning(f"Unknown agent action: {action}")
-                break
+                # Unknown action - treat as final answer
+                logger.warning(f"Unknown agent action: {action}. Treating as final answer.")
+                return self._handle_unknown_action(action, action_input, self.tool_history), self.tool_history
 
         # Fallback if max iterations reached
-        return "Не удалось завершить запрос. Пожалуйста, попробуйте еще раз.", self.tool_history
+        logger.warning(f"Max iterations ({self.max_iterations}) reached without FINAL_ANSWER")
+        return self._handle_max_iterations_response(), self.tool_history
 
     async def _get_agent_decision(self, system_prompt: str, user_message: str, chat_context: list) -> str:
         """Get agent decision from LLM."""
@@ -327,7 +345,6 @@ class ReActAgent:
         full_response = ""
         async for chunk in self.llm_client.chat_completion_stream(
             messages=messages,
-            temperature=0.7
         ):
             full_response += chunk
 
@@ -361,6 +378,7 @@ class ReActAgent:
       CALENDAR[текущая_дата]
 
    ВАЖНЫЕ ПРАВИЛА:
+   - Всегда пытайся решить задачу сам.
    - Дату ВСЕГДА указывай в формате YYYY-MM-DD (например: 2025-11-15)
    - Время в формате HH:MM (например: 10:00, 14:30)
    - Если пользователь говорит "сегодня" или "завтра" - преобразуй в конкретную дату
@@ -399,7 +417,7 @@ current_time: {datetime.now().strftime("%d,%m,%y %H:%M:%S")}
 ФОРМАТ ОТВЕТА:
 ═══════════════════════════════════════════════════════════════
 
-ДУМАЮ: [Логика мышления, включая преобразование дат]
+ДУМАЮ: [Логика мышления, включая преобразование дат! Обязательно в конце верни FINAL_ANSWER без него нельзя звыершить чат!!!!]
 ДЕЙСТВИЕ: [CALENDAR/WEBSEARCH/FINAL_ANSWER]
 [Параметры в правильном формате]
 
@@ -413,6 +431,9 @@ FINAL_ANSWER:
 [Здесь твой понятный человеку ответ]
 
 ВАЖНО:
+- Обязательно в конце верни FINAL_ANSWER без него нельзя звыершить чат!
+- Если есть ответ в доп информации сразу то не надо идти в интернет, отвечай сразу.
+- Отвечай только той информацией которую ты нашёл, от себя ни чего не добавляй
 - Не включай "ДУМАЮ:", "ДЕЙСТВИЕ:" в финальный ответ
 - Ответ должен быть КРАТКИМ и ПОНЯТНЫМ
 - Если была создана задача: "✅ Задача 'название' создана на дату в время"
@@ -486,6 +507,49 @@ FINAL_ANSWER:
 
         return "FINAL_ANSWER", clean_response if clean_response else response
 
+    def _handle_timeout_response(self) -> str:
+        """
+        Handle timeout case: return formatted response based on accumulated data.
+        """
+        if not self.accumulated_response:
+            return "⚠️ **Истёк лимит времени на обработку**\n\nИсходная обработка заняла более 40 секунд. Попробуйте переформулировать вопрос более кратко."
+
+        # Try to extract useful information from accumulated response
+        lines = self.accumulated_response.split('\n')
+        useful_lines = []
+        for line in lines:
+            line = line.strip()
+            if line and not any(marker in line.lower() for marker in ['думаю:', 'действие:', 'final_answer:', 'ответ:']):
+                useful_lines.append(line)
+
+        if useful_lines:
+            response_text = '\n'.join(useful_lines[:5])  # Take first 5 useful lines
+            return f"⚠️ **Ответ (из-за истечения лимита времени):**\n\n{response_text}\n\n_Обработка была прервана для обеспечения быстрого ответа._"
+        else:
+            return "⚠️ **Истёк лимит времени на обработку**\n\nСистема не смогла завершить обработку за отведённое время. Попробуйте переформулировать вопрос более кратко."
+
+    def _handle_unknown_action(self, action: str, action_input: str, tool_history: list) -> str:
+        """
+        Handle unknown action: return what we have so far.
+        """
+        if action_input:
+            return f"⚠️ **Неизвестное действие:** {action}\n\n{action_input}"
+        else:
+            return "⚠️ Не удалось определить действие для выполнения. Попробуйте переформулировать запрос."
+
+    def _handle_max_iterations_response(self) -> str:
+        """
+        Handle max iterations reached: return informative error.
+        """
+        if self.accumulated_response:
+            # Try to extract last meaningful response
+            lines = self.accumulated_response.split('\n')
+            useful_lines = [l.strip() for l in lines if l.strip() and not any(m in l.lower() for m in ['думаю:', 'действие:', 'final_answer:'])]
+            if useful_lines:
+                return f"⚠️ **Результат (достигнут лимит итераций):**\n\n{chr(10).join(useful_lines[:3])}"
+
+        return "⚠️ **Обработка завершена с ошибкой**\n\nДостигнут максимальный лимит итераций без полного завершения. Попробуйте переформулировать запрос."
+
     def _format_final_answer(self, answer: str, tool_history: list) -> str:
         """
         Format the final answer for human readability.
@@ -542,7 +606,7 @@ FINAL_ANSWER:
                 tools_summary += "\n"
 
             # Add the main answer with proper formatting
-            final_response = f"✅ **Результат:**\n\n{clean_answer}{tools_summary}"
+            final_response = f"✅ **Результат:**\n\n{clean_answer}"
         else:
             # No tools used, just clean answer
             final_response = f"💬 **Ответ:**\n\n{clean_answer}"

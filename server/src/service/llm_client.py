@@ -89,8 +89,6 @@ class LLMClient:
             stream = await self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
                 stream=True,
             )
 
@@ -106,7 +104,7 @@ class LLMClient:
     async def chat_completion(
         self,
         messages: List[Dict[str, str]],
-        temperature: float = 0.7,
+        temperature: float = 0.0,
         max_tokens: Optional[int] = None,
     ) -> str:
         """
@@ -126,8 +124,6 @@ class LLMClient:
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
                 stream=False,
             )
 

@@ -53,7 +53,7 @@ class GenerateSchemaTool:
         )
 
         logger.info(f"📐 Generating schema for: '{self.topic}' in {self.format} format")
-        schema_output = await self._llm.generate(prompt, max_tokens=500)
+        schema_output = await self._llm.generate(prompt)
 
         context.artifacts.append({
             "type": "generated_schema",
