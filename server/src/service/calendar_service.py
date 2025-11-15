@@ -4,10 +4,13 @@ Provides CRUD operations for calendar-related data
 """
 
 from typing import List, Optional, Dict
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel
 import json
 import os
+
+# UTC+3 timezone (Moscow Time)
+TZ_PLUS3 = timezone(timedelta(hours=3))
 
 
 class CalendarState(BaseModel):
@@ -119,14 +122,15 @@ class CalendarService:
             return self.states[key]
 
         # Create new state
+        now = datetime.now(TZ_PLUS3).isoformat()
         state = CalendarState(
             id=f"state_{user_id}_{year}_{month:02d}",
             user_id=user_id,
             year=year,
             month=month,
             tasks=[],
-            created_at=datetime.now().isoformat(),
-            updated_at=datetime.now().isoformat()
+            created_at=now,
+            updated_at=now
         )
 
         self.states[key] = state
@@ -177,7 +181,7 @@ class CalendarService:
 
         task_dict = task.model_dump()
         state.tasks.append(task_dict)
-        state.updated_at = datetime.now().isoformat()
+        state.updated_at = datetime.now(TZ_PLUS3).isoformat()
 
         self._save_state(state)
 
@@ -246,7 +250,7 @@ class CalendarService:
             return None
 
         state.tasks[task_index] = task_update.model_dump()
-        state.updated_at = datetime.now().isoformat()
+        state.updated_at = datetime.now(TZ_PLUS3).isoformat()
 
         self._save_state(state)
 
@@ -281,7 +285,7 @@ class CalendarService:
         if len(state.tasks) == initial_length:
             return False  # Task not found
 
-        state.updated_at = datetime.now().isoformat()
+        state.updated_at = datetime.now(TZ_PLUS3).isoformat()
         self._save_state(state)
 
         return True

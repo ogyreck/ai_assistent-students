@@ -109,6 +109,7 @@
 <script setup lang="ts">
 import { ref, computed, reactive, onMounted } from 'vue'
 import apiService from '@/services/api'
+import { dateToLocalDateString, getCurrentLocalDate, isToday } from '@/utils/dateTime'
 
 interface Task {
   id: string
@@ -177,11 +178,11 @@ const calendarDays = computed(() => {
   // Previous month days
   const prevMonthLastDay = new Date(year, month, 0).getDate()
   for (let i = firstDayWeekday - 1; i > 0; i--) {
-    const date = new Date(year, month - 1, prevMonthLastDay - i + 1)
-    const dateStr = date.toISOString().split('T')[0]!
+    const dayNum = prevMonthLastDay - i + 1
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`
     days.push({
       date: dateStr,
-      dayNumber: prevMonthLastDay - i + 1,
+      dayNumber: dayNum,
       isCurrentMonth: false,
       isToday: false,
       tasks: getTasksForDate(dateStr),
@@ -189,15 +190,14 @@ const calendarDays = computed(() => {
   }
 
   // Current month days
-  const today = new Date().toISOString().split('T')[0]!
+  const today = getCurrentLocalDate()
   for (let i = 1; i <= daysInMonth; i++) {
-    const date = new Date(year, month, i)
-    const dateStr = date.toISOString().split('T')[0]!
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`
     days.push({
       date: dateStr,
       dayNumber: i,
       isCurrentMonth: true,
-      isToday: dateStr === today,
+      isToday: isToday(dateStr),
       tasks: getTasksForDate(dateStr),
     })
   }
@@ -205,8 +205,10 @@ const calendarDays = computed(() => {
   // Next month days
   const remainingDays = 42 - days.length
   for (let i = 1; i <= remainingDays; i++) {
-    const date = new Date(year, month + 1, i)
-    const dateStr = date.toISOString().split('T')[0]!
+    const nextMonth = month + 2
+    const nextYear = nextMonth > 12 ? year + 1 : year
+    const displayMonth = nextMonth > 12 ? 1 : nextMonth
+    const dateStr = `${nextYear}-${String(displayMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`
     days.push({
       date: dateStr,
       dayNumber: i,
@@ -248,7 +250,7 @@ function selectDay(day: CalendarDay) {
 function openNewTaskModal(date?: string) {
   taskForm.title = ''
   taskForm.description = ''
-  taskForm.date = date || selectedDate.value || new Date().toISOString().split('T')[0]!
+  taskForm.date = date || selectedDate.value || getCurrentLocalDate()
   taskForm.time = '09:00'
   editingTask.value = null
   showModal.value = true

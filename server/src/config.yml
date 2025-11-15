@@ -6,7 +6,7 @@ transcribe:
 # LLM Configuration (OpenRouter)
 llm:
   url: https://caila.io/api/adapters/openai
-  model: just-ai/openai-proxy/gpt-4o-mini
+  model: just-ai/openai-proxy/gpt-4o
   token: 1000097868.172365.drHp7TnmsyVlDYv7mkCHm07OrJVAX4kXxdVPw7wB
 
 # Qdrant Vector Database Configuration
